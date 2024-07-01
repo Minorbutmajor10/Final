@@ -1,0 +1,139 @@
+import javax.mail.*;
+import javax.mail.internet.AddressException;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+
+import java.sql.*;
+
+import java.util.*;
+
+public class FinalProgram {
+
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        String confirmarEnvio;
+
+
+        // Datos de conexión a la base de datos
+        String DBurl = "jdbc:mysql://localhost:3306/geemarie";
+        String DBusuario = "root";
+        String DBpass = "";
+
+        // Consulta SQL para seleccionar datos
+        String sql = "SELECT * FROM mockdata";
+
+        // Ejecutar la consulta SQL (Donde solo encuentro APTO y VERDADERO)
+        String query = "SELECT id, nombres, apellidos, correo, estado_Postulacion, pendiente_Correo FROM mockdata " + "WHERE estado_Postulacion = 'Apto' AND pendiente_Correo = 'VERDADERO'";
+
+
+        // Lista para almacenar los correos y los IDs
+        List<String> correos = new ArrayList<>();
+        List<Integer> ids = new ArrayList<>();
+
+
+        try {
+            // Establecer conexión a la base de datos
+            Connection conn = DriverManager.getConnection(DBurl, DBusuario, DBpass);
+
+            // Preparar la consulta
+            Statement st = conn.createStatement();
+
+            // Ejecutar la consulta SQL
+            ResultSet resultado = st.executeQuery(query);
+
+
+
+            // Recorrer los resultados y almacenar correos e IDs en las listas
+            while (resultado.next()) {
+                String nombre = resultado.getString("nombres");
+                String apellido = resultado.getString("apellidos");
+                String correo = resultado.getString("correo");
+                int id = resultado.getInt("id");
+
+                System.out.println("Nombre: " + nombre + ", Apellido: " + apellido + ", Correo: " + correo);
+                correos.add(correo);
+                ids.add(id);
+
+            }
+
+            // Imprimir los correos obtenidos (opcional)
+            System.out.println("Correos obtenidos:");
+            for (String correo : correos) {
+                System.out.println(correo);
+            }
+
+
+            // Configuración del servidor SMTP y credentials
+
+            String MAILhost = "smtp.gmail.com"; // Cambia esto al servidor SMTP que corresponda
+            String MAILuser = "mariesdev@gmail.com"; // Cambia esto al correo de RRHH.
+            String MAILpass = "cvtr sxvf ufnv nyye"; // Cambia esto a tu contraseña // ENV BUSCAR!
+
+            Properties props = new Properties();
+
+            props.put("mail.smtp.auth", "true");
+            props.put("mail.smtp.starttls.enable", "true");
+            props.put("mail.smtp.host", MAILhost);
+            props.put("mail.smtp.port", "587");
+
+            // Creación de la sesión
+            Session session = Session.getInstance(props, new javax.mail.Authenticator() {
+                protected PasswordAuthentication getPasswordAuthentication() {
+                    return new PasswordAuthentication(MAILuser, MAILpass);
+                }
+            });
+
+
+            // Envío de correos a los destinatarios obtenidos
+            for (int i = 0; i < correos.size(); i++) {
+                String destinatario = correos.get(i);
+                int id = ids.get(i);
+
+                try {
+                    Message message = new MimeMessage(session);
+                    message.setFrom(new InternetAddress(MAILuser));
+                    message.setSubject("¡Felicidades pasaste a la siguiente etapa!");
+
+                    // Configurar destinatarios del mensaje
+                    message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(destinatario));
+
+                    // Contenido del mensaje
+                    message.setText("Estamos interesados en tu talento");
+
+                    // Enviar mensaje
+                    Transport.send(message);
+                    System.out.println("Correo enviado con éxito!");
+
+
+                    // Actualizar el campo pendiente_Correo a FALSO
+
+                    // Definir la consulta SQL de actualización, donde se establece el campo pendiente_Correo a 'FALSO' para un registro específico identificado por su id
+                    String updateSQL = "UPDATE mockdata SET pendiente_Correo = 'FALSO' WHERE id = ?";
+
+                    // Preparar la consulta de actualización utilizando un PreparedStatement para ejecutar la consulta SQL
+                    PreparedStatement updateStmt = conn.prepareStatement(updateSQL);
+
+                    // Asignar el valor del id en el lugar del parámetro (el signo ?) de la consulta SQL
+                    updateStmt.setInt(1, id);
+
+                    // Ejecutar la consulta de actualización en la base de datos
+                    updateStmt.executeUpdate();
+
+                    // Cerrar el PreparedStatement para liberar los recursos
+                    updateStmt.close();
+
+                } catch (MessagingException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            // Cerrar la conexión
+            conn.close();
+            
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+
+    }
+}
